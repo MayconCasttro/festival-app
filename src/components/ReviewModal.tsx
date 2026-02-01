@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { getDistanceFromLatLonInMeters } from '@/lib/geo';
 import { uploadReviewPhoto, saveReviewToFirestore } from '@/app/restaurant/[id]/actions'; // Importamos as funções novas
 import { Camera, MapPin, Loader2, Star, CheckCircle } from 'lucide-react';
-import { auth } from '@/lib/firebase';
+import { auth, isFirebaseConfigured } from '@/lib/firebase';
 import { 
   signInWithPopup, 
   GoogleAuthProvider, 
@@ -40,6 +40,11 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
   const handleSignIn = async (providerName: 'google' | 'github' | 'microsoft' | 'apple') => {
     setLoading(true);
     setError('');
+    if (!isFirebaseConfigured || !auth) {
+      setError('Autenticação não está configurada neste ambiente. Contate o mantenedor.');
+      setLoading(false);
+      return;
+    }
     let provider;
     
     switch (providerName) {

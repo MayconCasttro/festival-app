@@ -47,6 +47,12 @@ Note: `.env.local` is ignored by `.gitignore`. If you previously committed crede
 
 This project reads these variables in `src/lib/firebase.ts`.
 
+## Quick Troubleshooting
+
+- If you see runtime errors like `Firebase: Error (auth/invalid-api-key)`, ensure `.env.local` exists and values are correct.
+- After creating or updating `.env.local`, restart the dev server: `npm run dev`.
+- During development the app will show a friendly message in the review modal if Firebase isn't configured.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
