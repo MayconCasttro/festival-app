@@ -15,6 +15,8 @@ import {
   // O Discord não é um provedor direto, mas pode ser feito com OAuth genérico se necessário
   User
 } from "firebase/auth";
+import LocalizedText from './LocalizedText';
+import { TRANSLATIONS } from '@/i18n/translations';
 
 interface Props {
   restaurantId: string; // Adicionamos o ID para saber quem estamos avaliando
@@ -37,11 +39,23 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
   const [comment, setComment] = useState('');
 
   // 0. Autenticação
+  const t = (key: string) => {
+    try {
+      const lang = (localStorage.getItem('lang') || 'pt') as keyof typeof TRANSLATIONS;
+      // @ts-ignore
+      return TRANSLATIONS[lang]?.[key] ?? TRANSLATIONS['pt']?.[key] ?? key;
+    } catch (e) {
+      // fallback
+      // @ts-ignore
+      return TRANSLATIONS['pt']?.[key] ?? key;
+    }
+  };
+
   const handleSignIn = async (providerName: 'google' | 'github' | 'microsoft' | 'apple') => {
     setLoading(true);
     setError('');
     if (!isFirebaseConfigured || !auth) {
-      setError('Autenticação não está configurada neste ambiente. Contate o mantenedor.');
+      setError(t('authNotConfigured'));
       setLoading(false);
       return;
     }
@@ -70,7 +84,7 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
       setUser(result.user);
       setStep('gps');
     } catch (error) {
-      setError("Falha no login. Tente novamente.");
+      setError(t('loginError'));
       console.error(error);
     } finally {
       setLoading(false);
@@ -84,7 +98,7 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
     setError('');
 
     if (!navigator.geolocation) {
-      setError("Navegador sem suporte a GPS.");
+      setError(t('gpsNotSupported'));
       setLoading(false);
       return;
     }
@@ -109,7 +123,7 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
         setLoading(false);
       },
       () => {
-        setError("Ative o GPS para continuar.");
+        setError(t('enableGps'));
         setLoading(false);
       },
       { enableHighAccuracy: true }
@@ -122,12 +136,12 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
     if (selected) {
       // Validação: máximo 5MB
       if (selected.size > 5 * 1024 * 1024) {
-        setError('Imagem muito grande. Máximo 5MB.');
+        setError(t('imageTooLarge'));
         return;
       }
       // Validação: apenas imagens
       if (!selected.type.startsWith('image/')) {
-        setError('Selecione uma imagem válida.');
+        setError(t('invalidImage'));
         return;
       }
       setFile(selected);
@@ -179,29 +193,27 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
     return (
       <div className="p-6 bg-green-50 rounded-xl border border-green-200 text-center mt-6">
         <CheckCircle className="mx-auto text-green-600 mb-2" size={40} />
-        <h3 className="font-bold text-green-800">Avaliação Enviada!</h3>
-        <p className="text-sm text-green-700">Obrigado por participar.</p>
+        <h3 className="font-bold text-green-800"><LocalizedText defaultText={TRANSLATIONS.pt.reviewSentTitle} translations={{ pt: TRANSLATIONS.pt.reviewSentTitle, en: TRANSLATIONS.en.reviewSentTitle, es: TRANSLATIONS.es.reviewSentTitle, fr: TRANSLATIONS.fr.reviewSentTitle }} /></h3>
+        <p className="text-sm text-green-700"><LocalizedText defaultText={TRANSLATIONS.pt.reviewSentSub} translations={{ pt: TRANSLATIONS.pt.reviewSentSub, en: TRANSLATIONS.en.reviewSentSub, es: TRANSLATIONS.es.reviewSentSub, fr: TRANSLATIONS.fr.reviewSentSub }} /></p>
       </div>
     );
   }
 
   return (
     <div className="p-5 bg-white rounded-xl shadow-lg border border-gray-100 mt-6">
-      <h3 className="font-bold text-xl mb-1 text-gray-800">Avaliar Prato</h3>
+      <h3 className="font-bold text-xl mb-1 text-gray-800"><LocalizedText defaultText={TRANSLATIONS.pt.rateDish} translations={{ pt: TRANSLATIONS.pt.rateDish, en: TRANSLATIONS.en.rateDish, es: TRANSLATIONS.es.rateDish, fr: TRANSLATIONS.fr.rateDish }} /></h3>
       
       {error && <p className="text-red-500 text-sm mb-3 bg-red-50 p-2 rounded">{error}</p>}
 
       {/* ETAPA 0: AUTH */}
       {step === 'auth' && (
         <div className="text-center">
-            <p className="mb-4 text-gray-600">Deseja se identificar para a avaliação?</p>
+            <p className="mb-4 text-gray-600"><LocalizedText defaultText={TRANSLATIONS.pt.identifyPrompt} translations={{ pt: TRANSLATIONS.pt.identifyPrompt, en: TRANSLATIONS.en.identifyPrompt, es: TRANSLATIONS.es.identifyPrompt, fr: TRANSLATIONS.fr.identifyPrompt }} /></p>
             <div className="space-y-3">
-                <button onClick={() => handleSignIn('google')} className="w-full bg-red-500 text-white py-2 rounded-lg">Login com Google</button>
-                <button onClick={() => handleSignIn('microsoft')} className="w-full bg-blue-800 text-white py-2 rounded-lg">Login com Microsoft</button>
-                <button onClick={() => handleSignIn('github')} className="w-full bg-gray-800 text-white py-2 rounded-lg">Login com GitHub</button>
-                <button onClick={() => handleSignIn('apple')} className="w-full bg-black text-white py-2 rounded-lg">Login com Apple</button>
+                <button onClick={() => handleSignIn('google')} className="w-full bg-red-500 text-white py-2 rounded-lg"><LocalizedText defaultText={TRANSLATIONS.pt.loginWithGoogle} translations={{ pt: TRANSLATIONS.pt.loginWithGoogle, en: TRANSLATIONS.en.loginWithGoogle, es: TRANSLATIONS.es.loginWithGoogle, fr: TRANSLATIONS.fr.loginWithGoogle }} /></button>
+                <button onClick={() => handleSignIn('apple')} className="w-full bg-black text-white py-2 rounded-lg"><LocalizedText defaultText={TRANSLATIONS.pt.loginWithApple} translations={{ pt: TRANSLATIONS.pt.loginWithApple, en: TRANSLATIONS.en.loginWithApple, es: TRANSLATIONS.es.loginWithApple, fr: TRANSLATIONS.fr.loginWithApple }} /></button>
             </div>
-            <button onClick={() => setStep('gps')} className="mt-4 text-sm text-gray-500 hover:underline">Continuar como anônimo</button>
+            <button onClick={() => setStep('gps')} className="mt-4 text-sm text-gray-500 hover:underline"><LocalizedText defaultText={TRANSLATIONS.pt.continueAnonymous} translations={{ pt: TRANSLATIONS.pt.continueAnonymous, en: TRANSLATIONS.en.continueAnonymous, es: TRANSLATIONS.es.continueAnonymous, fr: TRANSLATIONS.fr.continueAnonymous }} /></button>
         </div>
       )}
 
@@ -214,14 +226,14 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
           className="flex items-center gap-2 bg-blue-600 text-white font-medium px-4 py-3 rounded-lg w-full justify-center"
         >
           {loading ? <Loader2 className="animate-spin" /> : <MapPin />}
-          Validar Localização
+          <LocalizedText defaultText={TRANSLATIONS.pt.validateLocation} translations={{ pt: TRANSLATIONS.pt.validateLocation, en: TRANSLATIONS.en.validateLocation, es: TRANSLATIONS.es.validateLocation, fr: TRANSLATIONS.fr.validateLocation }} />
         </button>
       )}
 
       {/* ETAPA 2: FOTO */}
       {step === 'photo' && (
         <label className="flex items-center gap-2 bg-orange-500 text-white font-medium px-4 py-3 rounded-lg w-full justify-center cursor-pointer">
-          <Camera /> Tirar Foto
+          <Camera /> <LocalizedText defaultText={TRANSLATIONS.pt.takePhoto} translations={{ pt: TRANSLATIONS.pt.takePhoto, en: TRANSLATIONS.en.takePhoto, es: TRANSLATIONS.es.takePhoto, fr: TRANSLATIONS.fr.takePhoto }} />
           <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
         </label>
       )}
@@ -248,7 +260,7 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
 
           {/* Comentário */}
           <textarea
-            placeholder="O que achou do prato?"
+            placeholder={TRANSLATIONS.pt.commentPlaceholder}
             className="w-full border p-3 rounded-lg mb-4 text-sm text-black"
             rows={3}
             value={comment}
@@ -260,7 +272,7 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
             disabled={loading}
             className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg"
           >
-            {loading ? "Enviando..." : "Confirmar Avaliação"}
+            {loading ? <LocalizedText defaultText={TRANSLATIONS.pt.sending} translations={{ pt: TRANSLATIONS.pt.sending, en: TRANSLATIONS.en.sending, es: TRANSLATIONS.es.sending, fr: TRANSLATIONS.fr.sending }} /> : <LocalizedText defaultText={TRANSLATIONS.pt.confirmReview} translations={{ pt: TRANSLATIONS.pt.confirmReview, en: TRANSLATIONS.en.confirmReview, es: TRANSLATIONS.es.confirmReview, fr: TRANSLATIONS.fr.confirmReview }} />}
           </button>
         </div>
       )}

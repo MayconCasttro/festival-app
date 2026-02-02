@@ -47,6 +47,18 @@ Note: `.env.local` is ignored by `.gitignore`. If you previously committed crede
 
 This project reads these variables in `src/lib/firebase.ts`.
 
+### Autenticação (OAuth) 🔐
+
+Para habilitar o login (Google, GitHub, Microsoft, Apple) no Firebase Console:
+
+- Ative os provedores em **Authentication → Sign-in method**.
+- Para **GitHub** configure Client ID e Client Secret no provedor GitHub.
+- Adicione seu domínio de desenvolvimento (`localhost:3000`) em **Authentication → Authorized domains**.
+- Use os valores do projeto nas variáveis `NEXT_PUBLIC_FIREBASE_*` descritas acima.
+- Após atualizar `.env.local`, reinicie o servidor (`npm run dev`).
+
+Durante desenvolvimento, se você optar por não configurar o Firebase, existe um botão **"Entrar como Dev (demo)"** no modal de avaliação que cria um usuário local apenas para testes (não persiste no servidor nem no Firestore).
+
 ## Quick Troubleshooting
 
 - If you see runtime errors like `Firebase: Error (auth/invalid-api-key)`, ensure `.env.local` exists and values are correct.

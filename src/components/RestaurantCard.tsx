@@ -3,12 +3,35 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Restaurant } from '@/lib/restaurants';
+import LocalizedText from './LocalizedText';
+import { TRANSLATIONS } from '@/i18n/translations';
 
 type RestaurantCardProps = {
   restaurant: Restaurant;
 };
 
 export default function RestaurantCard({ restaurant: r }: RestaurantCardProps) {
+  const nameTranslations = {
+    pt: r.name,
+    en: r.i18n?.en?.name ?? r.name,
+    es: r.i18n?.es?.name ?? r.name,
+    fr: r.i18n?.fr?.name ?? r.name,
+  };
+
+  const descTranslations = {
+    pt: r.description,
+    en: r.i18n?.en?.description ?? r.description,
+    es: r.i18n?.es?.description ?? r.description,
+    fr: r.i18n?.fr?.description ?? r.description,
+  };
+
+  const dishNameTranslations = {
+    pt: r.dishName,
+    en: r.i18n?.en?.dishName ?? r.dishName,
+    es: r.i18n?.es?.dishName ?? r.dishName,
+    fr: r.i18n?.fr?.dishName ?? r.dishName,
+  };
+
   return (
     <Link
       key={r.id}
@@ -20,9 +43,9 @@ export default function RestaurantCard({ restaurant: r }: RestaurantCardProps) {
       </div>
       <div className="flex flex-col grow justify-between">
         <div className="text-center">
-          <h3 className="font-bold text-lg text-gray-800">{r.name}</h3>
-          <p className="text-sm text-gray-500">{r.description}</p>
-          <p className="mt-2 text-sm text-gray-700 font-medium">Prato: {r.dishName}</p>
+          <h3 className="font-bold text-lg text-gray-800"><LocalizedText defaultText={r.name} translations={nameTranslations} /></h3>
+          <p className="text-sm text-gray-500"><LocalizedText defaultText={r.description} translations={descTranslations} /></p>
+          <p className="mt-2 text-sm text-gray-700 font-medium"><LocalizedText defaultText={`Prato: ${r.dishName}`} translations={{ pt: `Prato: ${r.dishName}`, en: `Dish: ${dishNameTranslations.en}`, es: `Plato: ${dishNameTranslations.es}`, fr: `Plat: ${dishNameTranslations.fr}` }} /></p>
         </div>
         <div className="mt-4 flex justify-center">
           <button
@@ -35,7 +58,7 @@ export default function RestaurantCard({ restaurant: r }: RestaurantCardProps) {
             className="inline-block bg-orange-500 text-white text-sm font-bold px-4 py-2 rounded-full hover:bg-orange-600 transition"
             aria-label={`Abrir rotas para ${r.name} no Google Maps`}
           >
-            Me leve até lá
+            <LocalizedText defaultText={TRANSLATIONS.pt.takeMeThere} translations={{ pt: TRANSLATIONS.pt.takeMeThere, en: TRANSLATIONS.en.takeMeThere, es: TRANSLATIONS.es.takeMeThere, fr: TRANSLATIONS.fr.takeMeThere }} />
           </button>
         </div>
       </div>

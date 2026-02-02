@@ -1,5 +1,8 @@
 // src/app/restaurant/[id]/page.tsx
 import ReviewModal from '@/components/ReviewModal';
+import RestaurantDetails from '@/components/RestaurantDetails';
+import LocalizedText from '@/components/LocalizedText';
+import { TRANSLATIONS } from '@/i18n/translations';
 import { MapPin } from 'lucide-react';
 import Image from 'next/image';
 
@@ -13,8 +16,8 @@ export default async function RestaurantPage({ params }: { params: Promise<{ id:
   if (!restaurant) {
     return (
       <main className="max-w-md mx-auto min-h-screen bg-white pb-20 shadow-xl overflow-hidden p-6">
-        <h2 className="text-xl font-bold">Restaurante não encontrado</h2>
-        <p className="text-gray-600">Verifique o restaurante selecionado ou volte para a lista.</p>
+        <h2 className="text-xl font-bold"><LocalizedText defaultText={TRANSLATIONS.pt.notFoundTitle} translations={{ pt: TRANSLATIONS.pt.notFoundTitle, en: TRANSLATIONS.en.notFoundTitle, es: TRANSLATIONS.es.notFoundTitle, fr: TRANSLATIONS.fr.notFoundTitle }} /></h2>
+        <p className="text-gray-600"><LocalizedText defaultText={TRANSLATIONS.pt.notFoundMessage} translations={{ pt: TRANSLATIONS.pt.notFoundMessage, en: TRANSLATIONS.en.notFoundMessage, es: TRANSLATIONS.es.notFoundMessage, fr: TRANSLATIONS.fr.notFoundMessage }} /></p>
       </main>
     );
   }
@@ -33,24 +36,18 @@ export default async function RestaurantPage({ params }: { params: Promise<{ id:
         )}
         {/* Gradiente para o texto ficar legível */}
         <div className="absolute bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent w-full p-6 pt-20">
-          <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded mb-2 inline-block">PRATO PARTICIPANTE</span>
-          <h1 className="text-white text-3xl font-bold leading-tight">{restaurant.dishName}</h1>
+          <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded mb-2 inline-block"><LocalizedText defaultText={TRANSLATIONS.pt.participantDishLabel} translations={{ pt: TRANSLATIONS.pt.participantDishLabel, en: TRANSLATIONS.en.participantDishLabel, es: TRANSLATIONS.es.participantDishLabel, fr: TRANSLATIONS.fr.participantDishLabel }} /></span>
+          {/* dish name is client-localized */}
+          <h1 className="text-white text-3xl font-bold leading-tight"><LocalizedText defaultText={restaurant.dishName} translations={{ pt: restaurant.dishName, en: restaurant.i18n?.en?.dishName ?? restaurant.dishName, es: restaurant.i18n?.es?.dishName ?? restaurant.dishName, fr: restaurant.i18n?.fr?.dishName ?? restaurant.dishName }} /></h1>
         </div>
       </div>
 
       <div className="p-6 -mt-4 bg-white rounded-t-3xl relative z-10">
         {/* 2. Informações do Restaurante */}
         <div className="mb-4">
-          <h2 className="text-2xl font-bold text-gray-800 mb-1">{restaurant.name}</h2>
-          <div className="flex items-center text-gray-500 text-sm">
-            <MapPin size={16} className="mr-1" />
-            <span>{restaurant.address}</span>
-          </div>
+          {/* Client component renders localized details */}
+          <RestaurantDetails restaurant={restaurant} />
         </div>
-
-        {/* 3. Descrição do prato */}
-        <p className="text-gray-600 text-sm leading-relaxed mb-4">{restaurant.description}</p>
-        <p className="text-gray-700 text-sm leading-relaxed mb-8">{restaurant.dishDescription}</p>
 
         {/* 4. Botão Review */}
         <ReviewModal restaurantId={restaurant.id} restaurantLat={lat} restaurantLng={lng} />
