@@ -1,23 +1,8 @@
 // src/lib/firebase.ts
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
-import type { Auth } from "firebase/auth";
-import type { Firestore } from "firebase/firestore";
-import type { FirebaseStorage } from "firebase/storage";
-let getAuth: any;
-let getFirestore: any;
-let getStorage: any;
-try {
-  // import only when available to avoid runtime errors if firebase isn't installed/configured
-  // (this keeps the module safe in environments without proper env vars)
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  ({ getAuth } = require('firebase/auth'));
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  ({ getFirestore } = require('firebase/firestore'));
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  ({ getStorage } = require('firebase/storage'));
-} catch (e) {
-  // noop - if imports fail, we'll handle via null exports below
-}
+import { getAuth, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 // Configuração via variáveis de ambiente. Use `.env.local` com as chaves abaixo.
 // Se as variáveis não estiverem definidas (ex.: dev), usamos um fallback público do projeto
