@@ -4,9 +4,10 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { getDistanceFromLatLonInMeters } from '@/lib/geo';
-import { uploadReviewPhoto, saveReviewToFirestore } from '@/app/restaurant/[id]/actions'; // Importamos as funções novas
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Camera, MapPin, Loader2, Star, CheckCircle } from 'lucide-react';
-import { auth, isFirebaseConfigured } from '@/lib/firebase';
+import { auth, isFirebaseConfigured, db, storage } from '@/lib/firebase';
 import { 
   signInWithPopup, 
   GoogleAuthProvider, 
@@ -161,23 +162,29 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
     setError('');
 
     try {
-      // A. Sobe a foto
-      const photoUrl = await uploadReviewPhoto(file);
-      
-      // B. Salva no banco
-      await saveReviewToFirestore({
+      // A. Faz upload no cliente (usuário autenticado)
+      const ext = file.name.split('.').pop() || 'jpg';
+      const filename = `reviews/review-${Date.now()}.${ext}`;
+      const storageRef = ref(storage, filename);
+      const snapshot = await uploadBytes(storageRef, file);
+      const photoUrl = await getDownloadURL(snapshot.ref);
+
+      // B. Salva no Firestore como usuário autenticado
+      await addDoc(collection(db, 'reviews'), {
         restaurantId,
         photoUrl,
         rating,
         comment,
-        user: user ? { uid: user.uid, displayName: user.displayName, photoURL: user.photoURL } : null
+        createdAt: serverTimestamp(),
+        user: user ? { uid: user.uid, name: user.displayName, avatar: user.photoURL } : null,
+        userId: user ? user.uid : 'user-anonimo'
       });
 
       // Limpar preview URL para evitar vazamento de memória
       if (preview) {
         URL.revokeObjectURL(preview);
       }
-      
+
       setStep('success');
     } catch (err) {
       setError("Erro ao enviar. Tente novamente.");
