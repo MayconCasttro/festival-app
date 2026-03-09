@@ -1,5 +1,5 @@
 // src/lib/firebase.ts
-import { initializeApp, getApps, FirebaseApp } from "firebase/app";
+import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
@@ -40,6 +40,12 @@ const isConfigPresent = !!(
   firebaseConfig.appId
 );
 
+let app: FirebaseApp | null = null;
+let _db: Firestore | null = null;
+let _storage: FirebaseStorage | null = null;
+let _auth: Auth | null = null;
+let isFirebaseConfigured = false;
+
 if (!isConfigPresent) {
   console.error("❌ Firebase config is incomplete!");
   console.error("apiKey:", firebaseConfig.apiKey ? "✓" : "✗");
@@ -51,14 +57,7 @@ if (!isConfigPresent) {
       "💡 Create a .env.local file with NEXT_PUBLIC_FIREBASE_ keys.",
     );
   }
-}
-
-let app: FirebaseApp | null = null;
-let _db: Firestore | null = null;
-let _storage: FirebaseStorage | null = null;
-let _auth: Auth | null = null;
-
-if (isConfigPresent) {
+} else {
   try {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
     console.log("✅ Firebase app initialized:", app.name);
@@ -68,7 +67,7 @@ if (isConfigPresent) {
 
   // Inicializa Firestore de forma segura — em alguns ambientes (p.ex. runtimes SSR) o serviço
   // pode não estar disponível e lançar. Tratamos com try/catch para evitar crashes.
-  if (getFirestore && app) {
+  if (app && typeof getFirestore === "function") {
     try {
       _db = getFirestore(app) as Firestore;
       console.log("✅ Firestore initialized");
@@ -78,7 +77,7 @@ if (isConfigPresent) {
     }
   }
 
-  if (getStorage && app) {
+  if (app && typeof getStorage === "function") {
     try {
       _storage = getStorage(app) as FirebaseStorage;
       console.log("✅ Storage initialized");
@@ -88,7 +87,7 @@ if (isConfigPresent) {
     }
   }
 
-  if (getAuth && app) {
+  if (app && typeof getAuth === "function") {
     try {
       _auth = getAuth(app) as Auth;
       console.log("✅ Auth initialized");
@@ -96,20 +95,22 @@ if (isConfigPresent) {
       console.error("❌ Auth não disponível neste ambiente:", e);
       _auth = null;
     }
+  }
 
-    if (typeof window !== "undefined") {
-      console.log("🔍 Firebase Status:", {
-        appInitialized: !!app,
-        authAvailable: !!_auth,
-        firebaseConfigured: Boolean(app && _auth),
-        environment: process.env.NODE_ENV,
-      });
-    }
+  // Determina se Firebase foi configurado com sucesso
+  isFirebaseConfigured = Boolean(app && _auth);
+
+  if (typeof window !== "undefined") {
+    console.log("🔍 Firebase Status:", {
+      appInitialized: !!app,
+      authAvailable: !!_auth,
+      firebaseConfigured: isFirebaseConfigured,
+      environment: process.env.NODE_ENV,
+    });
   }
 }
 
 export const db: any = _db;
 export const storage: any = _storage;
 export const auth: any = _auth;
-// Consideramos o Firebase "configurado" apenas se a app foi inicializada e o Auth está disponível.
-export const isFirebaseConfigured = Boolean(app && _auth);
+export { isFirebaseConfigured };
