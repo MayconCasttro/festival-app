@@ -4,9 +4,27 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 
+type UploadReviewPhotoResult =
+  | { ok: true; photoUrl: string }
+  | { ok: false; error: string };
+
+type SaveReviewResult =
+  | { ok: true; reviewId: string }
+  | { ok: false; error: string };
+
 // 1. Função que sobe a imagem para o Storage
-export async function uploadReviewPhoto(base64Data: string, mimeType: string) {
+export async function uploadReviewPhoto(
+  base64Data: string,
+  mimeType: string,
+): Promise<UploadReviewPhotoResult> {
   try {
+    if (!storage) {
+      return { ok: false, error: "Storage indisponível no servidor" };
+    }
+    if (!base64Data || !mimeType) {
+      return { ok: false, error: "Dados da imagem inválidos" };
+    }
+
     console.log("📸 Iniciando upload - tamanho Base64:", base64Data.length);
 
     // Converte Base64 para Uint8Array (mais compatível que Buffer)
@@ -34,10 +52,10 @@ export async function uploadReviewPhoto(base64Data: string, mimeType: string) {
     const downloadURL = await getDownloadURL(snapshot.ref);
     console.log("✅ URL gerada com sucesso");
 
-    return downloadURL;
+    return { ok: true, photoUrl: downloadURL };
   } catch (error: any) {
     console.error("❌ Erro no upload:", error);
-    throw new Error(error?.message || "Falha ao enviar imagem");
+    return { ok: false, error: error?.message || "Falha ao enviar imagem" };
   }
 }
 
@@ -52,8 +70,12 @@ export async function saveReviewToFirestore(data: {
     displayName: string | null;
     photoURL: string | null;
   } | null;
-}) {
+}): Promise<SaveReviewResult> {
   try {
+    if (!db) {
+      return { ok: false, error: "Banco de dados indisponível no servidor" };
+    }
+
     const { user, ...reviewData } = data;
 
     const docData = {
@@ -70,9 +92,9 @@ export async function saveReviewToFirestore(data: {
     };
 
     const docRef = await addDoc(collection(db, "reviews"), docData);
-    return docRef.id;
+    return { ok: true, reviewId: docRef.id };
   } catch (error) {
     console.error("Erro ao salvar review:", error);
-    throw new Error("Falha ao salvar avaliação");
+    return { ok: false, error: "Falha ao salvar avaliação" };
   }
 }

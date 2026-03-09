@@ -235,12 +235,18 @@ export default function ReviewModal({
 
       // A. Faz upload no servidor (server action)
       console.log("📤 Enviando para servidor...");
-      const photoUrl = await uploadReviewPhoto(base64Data, file.type);
+      const uploadResult = await uploadReviewPhoto(base64Data, file.type);
+      if (!uploadResult.ok) {
+        setError(uploadResult.error);
+        return;
+      }
+
+      const photoUrl = uploadResult.photoUrl;
       console.log("✅ Foto enviada com sucesso:", photoUrl);
 
       // B. Salva no Firestore via server action
       console.log("💾 Salvando avaliação no banco...");
-      await saveReviewToFirestore({
+      const saveResult = await saveReviewToFirestore({
         restaurantId,
         photoUrl,
         rating,
@@ -253,6 +259,12 @@ export default function ReviewModal({
             }
           : null,
       });
+
+      if (!saveResult.ok) {
+        setError(saveResult.error);
+        return;
+      }
+
       console.log("✅ Review salvo com sucesso");
 
       // Limpar preview URL para evitar vazamento de memória
