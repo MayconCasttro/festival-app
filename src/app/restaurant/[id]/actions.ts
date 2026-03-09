@@ -5,20 +5,31 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 
 // 1. Função que sobe a imagem para o Storage
-export async function uploadReviewPhoto(file: File) {
+export async function uploadReviewPhoto(base64Data: string, mimeType: string) {
   try {
-    // Cria um nome único para o arquivo (ex: review-123456789.jpg)
-    const filename = `reviews/review-${Date.now()}.jpg`;
+    // Converte Base64 para Buffer
+    const buffer = Buffer.from(base64Data, "base64");
+
+    // Cria um nome único para o arquivo
+    const ext = mimeType.split("/")[1] || "jpg";
+    const filename = `reviews/review-${Date.now()}.${ext}`;
     const storageRef = ref(storage, filename);
-    
+
+    console.log(`Fazendo upload para: ${filename}`);
+
     // Faz o upload
-    const snapshot = await uploadBytes(storageRef, file);
-    
-    // Pega o link público da imagem para salvarmos no banco
+    const snapshot = await uploadBytes(storageRef, buffer, {
+      contentType: mimeType,
+    });
+    console.log("✅ Upload concluído:", snapshot.ref.fullPath);
+
+    // Pega o link público da imagem
     const downloadURL = await getDownloadURL(snapshot.ref);
+    console.log("✅ URL gerada:", downloadURL);
+
     return downloadURL;
   } catch (error) {
-    console.error("Erro no upload:", error);
+    console.error("❌ Erro no upload:", error);
     throw new Error("Falha ao enviar imagem");
   }
 }
@@ -29,19 +40,25 @@ export async function saveReviewToFirestore(data: {
   photoUrl: string;
   rating: number;
   comment: string;
-  user: { uid: string; displayName: string | null; photoURL: string | null; } | null;
+  user: {
+    uid: string;
+    displayName: string | null;
+    photoURL: string | null;
+  } | null;
 }) {
   try {
     const { user, ...reviewData } = data;
-    
+
     const docData = {
       ...reviewData,
       createdAt: serverTimestamp(), // Data automática do servidor
-      user: user ? {
-        uid: user.uid,
-        name: user.displayName,
-        avatar: user.photoURL,
-      } : null,
+      user: user
+        ? {
+            uid: user.uid,
+            name: user.displayName,
+            avatar: user.photoURL,
+          }
+        : null,
       userId: user ? user.uid : "user-anonimo", // Mantém userId para regras de segurança
     };
 

@@ -4,10 +4,12 @@
 import { useState } from "react";
 import Image from "next/image";
 import { getDistanceFromLatLonInMeters } from "@/lib/geo";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { Camera, MapPin, Loader2, Star, CheckCircle } from "lucide-react";
-import { auth, isFirebaseConfigured, db, storage } from "@/lib/firebase";
+import { auth, isFirebaseConfigured } from "@/lib/firebase";
+import {
+  uploadReviewPhoto,
+  saveReviewToFirestore,
+} from "@/app/restaurant/[id]/actions";
 import {
   signInWithPopup,
   GoogleAuthProvider,
@@ -199,25 +201,42 @@ export default function ReviewModal({
     setError("");
 
     try {
-      // A. Faz upload no cliente (usuário autenticado)
-      const ext = file.name.split(".").pop() || "jpg";
-      const filename = `reviews/review-${Date.now()}.${ext}`;
-      const storageRef = ref(storage, filename);
-      const snapshot = await uploadBytes(storageRef, file);
-      const photoUrl = await getDownloadURL(snapshot.ref);
+      console.log("Iniciando upload da foto...");
 
-      // B. Salva no Firestore como usuário autenticado
-      await addDoc(collection(db, "reviews"), {
+      // Converter File para Base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]); // Remove "data:image/jpeg;base64,"
+        };
+        reader.onerror = reject;
+      });
+
+      reader.readAsDataURL(file);
+      const base64Data = await base64Promise;
+
+      console.log("✅ Arquivo convertido para Base64");
+
+      // A. Faz upload no servidor (server action)
+      const photoUrl = await uploadReviewPhoto(base64Data, file.type);
+      console.log("✅ Foto enviada com sucesso:", photoUrl);
+
+      // B. Salva no Firestore via server action
+      await saveReviewToFirestore({
         restaurantId,
         photoUrl,
         rating,
         comment,
-        createdAt: serverTimestamp(),
         user: user
-          ? { uid: user.uid, name: user.displayName, avatar: user.photoURL }
+          ? {
+              uid: user.uid,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+            }
           : null,
-        userId: user ? user.uid : "user-anonimo",
       });
+      console.log("✅ Review salvo com sucesso");
 
       // Limpar preview URL para evitar vazamento de memória
       if (preview) {
@@ -225,9 +244,9 @@ export default function ReviewModal({
       }
 
       setStep("success");
-    } catch (err) {
-      setError("Erro ao enviar. Tente novamente.");
-      console.error(err);
+    } catch (err: any) {
+      console.error("❌ Erro ao enviar review:", err);
+      setError(err?.message || "Erro ao enviar. Tente novamente.");
     } finally {
       setLoading(false);
     }
