@@ -7,7 +7,12 @@ import { getDistanceFromLatLonInMeters } from "@/lib/geo";
 import { Camera, MapPin, Loader2, Star, CheckCircle } from "lucide-react";
 import { auth, db, storage, isFirebaseConfigured } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import {
+  getDownloadURL,
+  ref,
+  uploadBytesResumable,
+  type UploadMetadata,
+} from "firebase/storage";
 import {
   signInWithPopup,
   GoogleAuthProvider,
@@ -30,6 +35,72 @@ export default function ReviewModal({
   restaurantLat,
   restaurantLng,
 }: Props) {
+  const compressImage = async (inputFile: File): Promise<Blob> => {
+    if (!inputFile.type.startsWith("image/")) return inputFile;
+
+    const bitmap = await createImageBitmap(inputFile);
+    const maxSide = 1600;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return inputFile;
+
+    // Resize before upload to avoid long transfers on slower networks.
+    ctx.drawImage(bitmap, 0, 0, width, height);
+
+    const outputType =
+      inputFile.type === "image/png" ? "image/png" : "image/jpeg";
+    const quality = outputType === "image/jpeg" ? 0.8 : undefined;
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (result) => {
+          if (!result) {
+            reject(new Error("Falha ao processar imagem"));
+            return;
+          }
+          resolve(result);
+        },
+        outputType,
+        quality,
+      );
+    });
+
+    bitmap.close();
+    return blob;
+  };
+
+  const uploadResumableWithTimeout = async (
+    uploadRef: ReturnType<typeof ref>,
+    data: Blob,
+    metadata: UploadMetadata,
+    timeoutMs: number,
+  ) => {
+    const task = uploadBytesResumable(uploadRef, data, metadata);
+
+    const uploadPromise = new Promise<typeof task.snapshot>(
+      (resolve, reject) => {
+        task.on(
+          "state_changed",
+          undefined,
+          (error) => reject(error),
+          () => resolve(task.snapshot),
+        );
+      },
+    );
+
+    return await withTimeout(
+      uploadPromise,
+      timeoutMs,
+      "Upload da foto demorou demais. Verifique sua internet e tente novamente.",
+    );
+  };
+
   const withTimeout = async <T,>(
     promise: Promise<T>,
     ms: number,
@@ -232,20 +303,26 @@ export default function ReviewModal({
 
       // A. Faz upload direto no Firebase Storage (cliente)
       console.log("📤 Enviando para Firebase Storage...");
+      const compressedImage = await compressImage(file);
       const ext = file.type.split("/")[1] || "jpg";
       const filename = `reviews/${auth.currentUser.uid}/review-${Date.now()}.${ext}`;
       const storageRef = ref(storage, filename);
-      const snapshot = await withTimeout(
-        uploadBytes(storageRef, file, {
-          contentType: file.type,
-          cacheControl: "public,max-age=3600",
-        }),
-        30000,
-        "Upload da foto demorou demais. Tente novamente.",
+      const metadata: UploadMetadata = {
+        contentType:
+          compressedImage.type ||
+          (file.type === "image/png" ? "image/png" : "image/jpeg"),
+        cacheControl: "public,max-age=3600",
+      };
+
+      const snapshot = await uploadResumableWithTimeout(
+        storageRef,
+        compressedImage,
+        metadata,
+        120000,
       );
       const photoUrl = await withTimeout(
         getDownloadURL(snapshot.ref),
-        15000,
+        30000,
         "Não foi possível obter o link da foto.",
       );
       console.log("✅ Foto enviada com sucesso:", photoUrl);
