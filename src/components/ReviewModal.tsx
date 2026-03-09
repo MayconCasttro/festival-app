@@ -1,23 +1,23 @@
 // src/components/ReviewModal.tsx
 "use client";
 
-import { useState } from 'react';
-import Image from 'next/image';
-import { getDistanceFromLatLonInMeters } from '@/lib/geo';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Camera, MapPin, Loader2, Star, CheckCircle } from 'lucide-react';
-import { auth, isFirebaseConfigured, db, storage } from '@/lib/firebase';
-import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
+import { useState } from "react";
+import Image from "next/image";
+import { getDistanceFromLatLonInMeters } from "@/lib/geo";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { Camera, MapPin, Loader2, Star, CheckCircle } from "lucide-react";
+import { auth, isFirebaseConfigured, db, storage } from "@/lib/firebase";
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
   GithubAuthProvider,
   OAuthProvider, // Para Microsoft
   // O Discord não é um provedor direto, mas pode ser feito com OAuth genérico se necessário
-  User
+  User,
 } from "firebase/auth";
-import LocalizedText from './LocalizedText';
-import { TRANSLATIONS } from '@/i18n/translations';
+import LocalizedText from "./LocalizedText";
+import { TRANSLATIONS } from "@/i18n/translations";
 
 interface Props {
   restaurantId: string; // Adicionamos o ID para saber quem estamos avaliando
@@ -25,55 +25,63 @@ interface Props {
   restaurantLng: number;
 }
 
-export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng }: Props) {
+export default function ReviewModal({
+  restaurantId,
+  restaurantLat,
+  restaurantLng,
+}: Props) {
   // Estados de Fluxo
-  const [step, setStep] = useState<'auth' |'gps' | 'photo' | 'form' | 'success'>('auth');
+  const [step, setStep] = useState<
+    "auth" | "gps" | "photo" | "form" | "success"
+  >("auth");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [user, setUser] = useState<User | null>(null);
-
 
   // Estados do Formulário
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string>('');
+  const [preview, setPreview] = useState<string>("");
   const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState('');
+  const [comment, setComment] = useState("");
 
   // 0. Autenticação
   const t = (key: string) => {
     try {
-      const lang = (localStorage.getItem('lang') || 'pt') as keyof typeof TRANSLATIONS;
+      const lang = (localStorage.getItem("lang") ||
+        "pt") as keyof typeof TRANSLATIONS;
       // @ts-ignore
-      return TRANSLATIONS[lang]?.[key] ?? TRANSLATIONS['pt']?.[key] ?? key;
+      return TRANSLATIONS[lang]?.[key] ?? TRANSLATIONS["pt"]?.[key] ?? key;
     } catch (e) {
       // fallback
       // @ts-ignore
-      return TRANSLATIONS['pt']?.[key] ?? key;
+      return TRANSLATIONS["pt"]?.[key] ?? key;
     }
   };
 
-  const handleSignIn = async (providerName: 'google' | 'github' | 'microsoft' | 'apple') => {
+  const handleSignIn = async (
+    providerName: "google" | "github" | "microsoft" | "apple",
+  ) => {
     setLoading(true);
-    setError('');
+    setError("");
     if (!isFirebaseConfigured || !auth) {
-      setError(t('authNotConfigured'));
+      setError(t("authNotConfigured"));
       setLoading(false);
       return;
     }
     let provider;
-    
+
     switch (providerName) {
-      case 'google':
+      case "google":
         provider = new GoogleAuthProvider();
         break;
-      case 'github':
+      case "github":
         provider = new GithubAuthProvider();
         break;
-      case 'microsoft':
-        provider = new OAuthProvider('microsoft.com');
+      case "microsoft":
+        provider = new OAuthProvider("microsoft.com");
         break;
-      case 'apple':
-        provider = new OAuthProvider('apple.com');
+      case "apple":
+        provider = new OAuthProvider("apple.com");
         break;
       default:
         setLoading(false);
@@ -83,23 +91,43 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
     try {
       const result = await signInWithPopup(auth, provider);
       setUser(result.user);
-      setStep('gps');
-    } catch (error) {
-      setError(t('loginError'));
-      console.error(error);
+      setStep("gps");
+    } catch (error: any) {
+      console.error("❌ Firebase Auth Error:", {
+        code: error?.code,
+        message: error?.message,
+        customData: error?.customData,
+        email: error?.email,
+      });
+
+      // Melhor diagnóstico do erro
+      if (error?.code === "auth/popup-blocked") {
+        setError("Popup bloqueado. Permita janelas pop-up neste site.");
+      } else if (error?.code === "auth/unauthorized-domain") {
+        setError("Domínio não autorizado no Firebase. Contate o mantenedor.");
+      } else if (
+        error?.code === "auth/operation-not-supported-in-this-environment"
+      ) {
+        setError(
+          "Autenticação não disponível neste ambiente. Tente outro navegador.",
+        );
+      } else if (error?.code === "auth/internal-error") {
+        setError("Erro interno do Firebase. Verifique as credenciais.");
+      } else {
+        setError(`${t("loginError")} (${error?.code || "unknown"})`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-
   // 1. Verificar GPS
   const checkLocation = () => {
     setLoading(true);
-    setError('');
+    setError("");
 
     if (!navigator.geolocation) {
-      setError(t('gpsNotSupported'));
+      setError(t("gpsNotSupported"));
       setLoading(false);
       return;
     }
@@ -107,13 +135,22 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         try {
-          if (process.env.NODE_ENV === 'development') {
-            console.log("Sua localização:", pos.coords.latitude, pos.coords.longitude);
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              "Sua localização:",
+              pos.coords.latitude,
+              pos.coords.longitude,
+            );
           }
-          const dist = getDistanceFromLatLonInMeters(pos.coords.latitude, pos.coords.longitude, restaurantLat, restaurantLng);
+          const dist = getDistanceFromLatLonInMeters(
+            pos.coords.latitude,
+            pos.coords.longitude,
+            restaurantLat,
+            restaurantLng,
+          );
           // Usando 1000m (1km) para facilitar seus testes. Em produção use 200m.
           if (dist <= 1000) {
-            setStep('photo'); // Passa para a etapa da foto
+            setStep("photo"); // Passa para a etapa da foto
           } else {
             setError(`Você está longe (${Math.round(dist)}m).`);
           }
@@ -124,10 +161,10 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
         setLoading(false);
       },
       () => {
-        setError(t('enableGps'));
+        setError(t("enableGps"));
         setLoading(false);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true },
     );
   };
 
@@ -137,17 +174,17 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
     if (selected) {
       // Validação: máximo 5MB
       if (selected.size > 5 * 1024 * 1024) {
-        setError(t('imageTooLarge'));
+        setError(t("imageTooLarge"));
         return;
       }
       // Validação: apenas imagens
-      if (!selected.type.startsWith('image/')) {
-        setError(t('invalidImage'));
+      if (!selected.type.startsWith("image/")) {
+        setError(t("invalidImage"));
         return;
       }
       setFile(selected);
       setPreview(URL.createObjectURL(selected)); // Cria preview local
-      setStep('form'); // Passa para o formulário
+      setStep("form"); // Passa para o formulário
     }
   };
 
@@ -155,29 +192,31 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
   const handleSubmit = async () => {
     if (!file) return;
     if (!comment.trim()) {
-      setError('Por favor, escreva um comentário.');
+      setError("Por favor, escreva um comentário.");
       return;
     }
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       // A. Faz upload no cliente (usuário autenticado)
-      const ext = file.name.split('.').pop() || 'jpg';
+      const ext = file.name.split(".").pop() || "jpg";
       const filename = `reviews/review-${Date.now()}.${ext}`;
       const storageRef = ref(storage, filename);
       const snapshot = await uploadBytes(storageRef, file);
       const photoUrl = await getDownloadURL(snapshot.ref);
 
       // B. Salva no Firestore como usuário autenticado
-      await addDoc(collection(db, 'reviews'), {
+      await addDoc(collection(db, "reviews"), {
         restaurantId,
         photoUrl,
         rating,
         comment,
         createdAt: serverTimestamp(),
-        user: user ? { uid: user.uid, name: user.displayName, avatar: user.photoURL } : null,
-        userId: user ? user.uid : 'user-anonimo'
+        user: user
+          ? { uid: user.uid, name: user.displayName, avatar: user.photoURL }
+          : null,
+        userId: user ? user.uid : "user-anonimo",
       });
 
       // Limpar preview URL para evitar vazamento de memória
@@ -185,7 +224,7 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
         URL.revokeObjectURL(preview);
       }
 
-      setStep('success');
+      setStep("success");
     } catch (err) {
       setError("Erro ao enviar. Tente novamente.");
       console.error(err);
@@ -195,58 +234,162 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
   };
 
   // --- RENDERIZAÇÃO ---
-  
-  if (step === 'success') {
+
+  if (step === "success") {
     return (
       <div className="p-6 bg-green-50 rounded-xl border border-green-200 text-center mt-6">
         <CheckCircle className="mx-auto text-green-600 mb-2" size={40} />
-        <h3 className="font-bold text-green-800"><LocalizedText defaultText={TRANSLATIONS.pt.reviewSentTitle} translations={{ pt: TRANSLATIONS.pt.reviewSentTitle, en: TRANSLATIONS.en.reviewSentTitle, es: TRANSLATIONS.es.reviewSentTitle, fr: TRANSLATIONS.fr.reviewSentTitle }} /></h3>
-        <p className="text-sm text-green-700"><LocalizedText defaultText={TRANSLATIONS.pt.reviewSentSub} translations={{ pt: TRANSLATIONS.pt.reviewSentSub, en: TRANSLATIONS.en.reviewSentSub, es: TRANSLATIONS.es.reviewSentSub, fr: TRANSLATIONS.fr.reviewSentSub }} /></p>
+        <h3 className="font-bold text-green-800">
+          <LocalizedText
+            defaultText={TRANSLATIONS.pt.reviewSentTitle}
+            translations={{
+              pt: TRANSLATIONS.pt.reviewSentTitle,
+              en: TRANSLATIONS.en.reviewSentTitle,
+              es: TRANSLATIONS.es.reviewSentTitle,
+              fr: TRANSLATIONS.fr.reviewSentTitle,
+            }}
+          />
+        </h3>
+        <p className="text-sm text-green-700">
+          <LocalizedText
+            defaultText={TRANSLATIONS.pt.reviewSentSub}
+            translations={{
+              pt: TRANSLATIONS.pt.reviewSentSub,
+              en: TRANSLATIONS.en.reviewSentSub,
+              es: TRANSLATIONS.es.reviewSentSub,
+              fr: TRANSLATIONS.fr.reviewSentSub,
+            }}
+          />
+        </p>
       </div>
     );
   }
 
   return (
     <div className="p-5 bg-white rounded-xl shadow-lg border border-gray-100 mt-6">
-      <h3 className="font-bold text-xl mb-1 text-gray-800"><LocalizedText defaultText={TRANSLATIONS.pt.rateDish} translations={{ pt: TRANSLATIONS.pt.rateDish, en: TRANSLATIONS.en.rateDish, es: TRANSLATIONS.es.rateDish, fr: TRANSLATIONS.fr.rateDish }} /></h3>
-      
-      {error && <p className="text-red-500 text-sm mb-3 bg-red-50 p-2 rounded">{error}</p>}
+      <h3 className="font-bold text-xl mb-1 text-gray-800">
+        <LocalizedText
+          defaultText={TRANSLATIONS.pt.rateDish}
+          translations={{
+            pt: TRANSLATIONS.pt.rateDish,
+            en: TRANSLATIONS.en.rateDish,
+            es: TRANSLATIONS.es.rateDish,
+            fr: TRANSLATIONS.fr.rateDish,
+          }}
+        />
+      </h3>
+
+      {error && (
+        <p className="text-red-500 text-sm mb-3 bg-red-50 p-2 rounded">
+          {error}
+        </p>
+      )}
 
       {/* ETAPA 0: AUTH */}
-      {step === 'auth' && (
+      {step === "auth" && (
         <div className="text-center">
-            <p className="mb-4 text-gray-600"><LocalizedText defaultText={TRANSLATIONS.pt.identifyPrompt} translations={{ pt: TRANSLATIONS.pt.identifyPrompt, en: TRANSLATIONS.en.identifyPrompt, es: TRANSLATIONS.es.identifyPrompt, fr: TRANSLATIONS.fr.identifyPrompt }} /></p>
-            <div className="space-y-3">
-                <button onClick={() => handleSignIn('google')} className="w-full bg-red-500 text-white py-2 rounded-lg"><LocalizedText defaultText={TRANSLATIONS.pt.loginWithGoogle} translations={{ pt: TRANSLATIONS.pt.loginWithGoogle, en: TRANSLATIONS.en.loginWithGoogle, es: TRANSLATIONS.es.loginWithGoogle, fr: TRANSLATIONS.fr.loginWithGoogle }} /></button>
-                <button onClick={() => handleSignIn('apple')} className="w-full bg-black text-white py-2 rounded-lg"><LocalizedText defaultText={TRANSLATIONS.pt.loginWithApple} translations={{ pt: TRANSLATIONS.pt.loginWithApple, en: TRANSLATIONS.en.loginWithApple, es: TRANSLATIONS.es.loginWithApple, fr: TRANSLATIONS.fr.loginWithApple }} /></button>
-            </div>
-            <button onClick={() => setStep('gps')} className="mt-4 text-sm text-gray-500 hover:underline"><LocalizedText defaultText={TRANSLATIONS.pt.continueAnonymous} translations={{ pt: TRANSLATIONS.pt.continueAnonymous, en: TRANSLATIONS.en.continueAnonymous, es: TRANSLATIONS.es.continueAnonymous, fr: TRANSLATIONS.fr.continueAnonymous }} /></button>
+          <p className="mb-4 text-gray-600">
+            <LocalizedText
+              defaultText={TRANSLATIONS.pt.identifyPrompt}
+              translations={{
+                pt: TRANSLATIONS.pt.identifyPrompt,
+                en: TRANSLATIONS.en.identifyPrompt,
+                es: TRANSLATIONS.es.identifyPrompt,
+                fr: TRANSLATIONS.fr.identifyPrompt,
+              }}
+            />
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={() => handleSignIn("google")}
+              className="w-full bg-red-500 text-white py-2 rounded-lg"
+            >
+              <LocalizedText
+                defaultText={TRANSLATIONS.pt.loginWithGoogle}
+                translations={{
+                  pt: TRANSLATIONS.pt.loginWithGoogle,
+                  en: TRANSLATIONS.en.loginWithGoogle,
+                  es: TRANSLATIONS.es.loginWithGoogle,
+                  fr: TRANSLATIONS.fr.loginWithGoogle,
+                }}
+              />
+            </button>
+            <button
+              onClick={() => handleSignIn("apple")}
+              className="w-full bg-black text-white py-2 rounded-lg"
+            >
+              <LocalizedText
+                defaultText={TRANSLATIONS.pt.loginWithApple}
+                translations={{
+                  pt: TRANSLATIONS.pt.loginWithApple,
+                  en: TRANSLATIONS.en.loginWithApple,
+                  es: TRANSLATIONS.es.loginWithApple,
+                  fr: TRANSLATIONS.fr.loginWithApple,
+                }}
+              />
+            </button>
+          </div>
+          <button
+            onClick={() => setStep("gps")}
+            className="mt-4 text-sm text-gray-500 hover:underline"
+          >
+            <LocalizedText
+              defaultText={TRANSLATIONS.pt.continueAnonymous}
+              translations={{
+                pt: TRANSLATIONS.pt.continueAnonymous,
+                en: TRANSLATIONS.en.continueAnonymous,
+                es: TRANSLATIONS.es.continueAnonymous,
+                fr: TRANSLATIONS.fr.continueAnonymous,
+              }}
+            />
+          </button>
         </div>
       )}
 
-
       {/* ETAPA 1: GPS */}
-      {step === 'gps' && (
-        <button 
+      {step === "gps" && (
+        <button
           onClick={checkLocation}
           disabled={loading}
           className="flex items-center gap-2 bg-blue-600 text-white font-medium px-4 py-3 rounded-lg w-full justify-center"
         >
           {loading ? <Loader2 className="animate-spin" /> : <MapPin />}
-          <LocalizedText defaultText={TRANSLATIONS.pt.validateLocation} translations={{ pt: TRANSLATIONS.pt.validateLocation, en: TRANSLATIONS.en.validateLocation, es: TRANSLATIONS.es.validateLocation, fr: TRANSLATIONS.fr.validateLocation }} />
+          <LocalizedText
+            defaultText={TRANSLATIONS.pt.validateLocation}
+            translations={{
+              pt: TRANSLATIONS.pt.validateLocation,
+              en: TRANSLATIONS.en.validateLocation,
+              es: TRANSLATIONS.es.validateLocation,
+              fr: TRANSLATIONS.fr.validateLocation,
+            }}
+          />
         </button>
       )}
 
       {/* ETAPA 2: FOTO */}
-      {step === 'photo' && (
+      {step === "photo" && (
         <label className="flex items-center gap-2 bg-orange-500 text-white font-medium px-4 py-3 rounded-lg w-full justify-center cursor-pointer">
-          <Camera /> <LocalizedText defaultText={TRANSLATIONS.pt.takePhoto} translations={{ pt: TRANSLATIONS.pt.takePhoto, en: TRANSLATIONS.en.takePhoto, es: TRANSLATIONS.es.takePhoto, fr: TRANSLATIONS.fr.takePhoto }} />
-          <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+          <Camera />{" "}
+          <LocalizedText
+            defaultText={TRANSLATIONS.pt.takePhoto}
+            translations={{
+              pt: TRANSLATIONS.pt.takePhoto,
+              en: TRANSLATIONS.en.takePhoto,
+              es: TRANSLATIONS.es.takePhoto,
+              fr: TRANSLATIONS.fr.takePhoto,
+            }}
+          />
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
         </label>
       )}
 
       {/* ETAPA 3: FORMULÁRIO */}
-      {step === 'form' && (
+      {step === "form" && (
         <div className="animate-in fade-in">
           {/* Preview da foto */}
           <div className="relative w-full h-40 bg-gray-100 rounded-lg mb-4 overflow-hidden">
@@ -257,9 +400,13 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
           <div className="flex justify-center gap-2 mb-4">
             {[1, 2, 3, 4, 5].map((star) => (
               <button key={star} onClick={() => setRating(star)} type="button">
-                <Star 
-                  size={32} 
-                  className={star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} 
+                <Star
+                  size={32}
+                  className={
+                    star <= rating
+                      ? "fill-yellow-400 text-yellow-400"
+                      : "text-gray-300"
+                  }
                 />
               </button>
             ))}
@@ -271,15 +418,35 @@ export default function ReviewModal({ restaurantId, restaurantLat, restaurantLng
             className="w-full border p-3 rounded-lg mb-4 text-sm text-black"
             rows={3}
             value={comment}
-            onChange={e => setComment(e.target.value)}
+            onChange={(e) => setComment(e.target.value)}
           />
 
-          <button 
+          <button
             onClick={handleSubmit}
             disabled={loading}
             className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg"
           >
-            {loading ? <LocalizedText defaultText={TRANSLATIONS.pt.sending} translations={{ pt: TRANSLATIONS.pt.sending, en: TRANSLATIONS.en.sending, es: TRANSLATIONS.es.sending, fr: TRANSLATIONS.fr.sending }} /> : <LocalizedText defaultText={TRANSLATIONS.pt.confirmReview} translations={{ pt: TRANSLATIONS.pt.confirmReview, en: TRANSLATIONS.en.confirmReview, es: TRANSLATIONS.es.confirmReview, fr: TRANSLATIONS.fr.confirmReview }} />}
+            {loading ? (
+              <LocalizedText
+                defaultText={TRANSLATIONS.pt.sending}
+                translations={{
+                  pt: TRANSLATIONS.pt.sending,
+                  en: TRANSLATIONS.en.sending,
+                  es: TRANSLATIONS.es.sending,
+                  fr: TRANSLATIONS.fr.sending,
+                }}
+              />
+            ) : (
+              <LocalizedText
+                defaultText={TRANSLATIONS.pt.confirmReview}
+                translations={{
+                  pt: TRANSLATIONS.pt.confirmReview,
+                  en: TRANSLATIONS.en.confirmReview,
+                  es: TRANSLATIONS.es.confirmReview,
+                  fr: TRANSLATIONS.fr.confirmReview,
+                }}
+              />
+            )}
           </button>
         </div>
       )}
