@@ -60,7 +60,7 @@ if (isConfigPresent) {
 
   // Inicializa Firestore de forma segura — em alguns ambientes (p.ex. runtimes SSR) o serviço
   // pode não estar disponível e lançar. Tratamos com try/catch para evitar crashes.
-  if (getFirestore) {
+  if (getFirestore && app) {
     try {
       _db = getFirestore(app) as Firestore;
       console.log("✅ Firestore initialized");
@@ -70,7 +70,7 @@ if (isConfigPresent) {
     }
   }
 
-  if (getStorage) {
+  if (getStorage && app) {
     try {
       _storage = getStorage(app) as FirebaseStorage;
       console.log("✅ Storage initialized");
@@ -80,7 +80,7 @@ if (isConfigPresent) {
     }
   }
 
-  if (getAuth) {
+  if (getAuth && app) {
     try {
       _auth = getAuth(app) as Auth;
       console.log("✅ Auth initialized");
@@ -93,7 +93,7 @@ if (isConfigPresent) {
       console.log("🔍 Firebase Status:", {
         appInitialized: !!app,
         authAvailable: !!_auth,
-        firebaseConfigured: isFirebaseConfigured,
+        firebaseConfigured: Boolean(app && _auth),
         environment: process.env.NODE_ENV,
       });
     }
