@@ -30,6 +30,19 @@ export default function ReviewModal({
   restaurantLat,
   restaurantLng,
 }: Props) {
+  const withTimeout = async <T,>(
+    promise: Promise<T>,
+    ms: number,
+    timeoutMessage: string,
+  ): Promise<T> => {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        setTimeout(() => reject(new Error(timeoutMessage)), ms);
+      }),
+    ]);
+  };
+
   // Estados de Fluxo
   const [step, setStep] = useState<
     "auth" | "gps" | "photo" | "form" | "success"
@@ -201,35 +214,11 @@ export default function ReviewModal({
     try {
       console.log("🚀 Iniciando envio de review...");
 
-      // Converter File para Base64
-      console.log("📖 Convertendo arquivo para Base64...");
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-          try {
-            const result = reader.result as string;
-            const base64 = result.split(",")[1]; // Remove "data:image/jpeg;base64,"
-            if (!base64) {
-              reject(new Error("Falha ao converter arquivo para Base64"));
-              return;
-            }
-            resolve(base64);
-          } catch (e) {
-            reject(e);
-          }
-        };
-        reader.onerror = (e) => {
-          console.error("❌ Erro ao ler arquivo:", e);
-          reject(new Error("Não foi possível ler o arquivo"));
-        };
-      });
-
-      reader.readAsDataURL(file);
-      const base64Data = await base64Promise;
-
-      console.log(
-        "✅ Arquivo convertido para Base64 (" + base64Data.length + " bytes)",
-      );
+      if (!user || !auth?.currentUser) {
+        setError("Faça login para enviar foto.");
+        setStep("auth");
+        return;
+      }
 
       if (!storage) {
         setError("Storage indisponível");
@@ -243,39 +232,43 @@ export default function ReviewModal({
 
       // A. Faz upload direto no Firebase Storage (cliente)
       console.log("📤 Enviando para Firebase Storage...");
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: file.type });
-
       const ext = file.type.split("/")[1] || "jpg";
-      const filename = `reviews/review-${Date.now()}.${ext}`;
+      const filename = `reviews/${auth.currentUser.uid}/review-${Date.now()}.${ext}`;
       const storageRef = ref(storage, filename);
-      const snapshot = await uploadBytes(storageRef, blob, {
-        contentType: file.type,
-      });
-      const photoUrl = await getDownloadURL(snapshot.ref);
+      const snapshot = await withTimeout(
+        uploadBytes(storageRef, file, {
+          contentType: file.type,
+          cacheControl: "public,max-age=3600",
+        }),
+        30000,
+        "Upload da foto demorou demais. Tente novamente.",
+      );
+      const photoUrl = await withTimeout(
+        getDownloadURL(snapshot.ref),
+        15000,
+        "Não foi possível obter o link da foto.",
+      );
       console.log("✅ Foto enviada com sucesso:", photoUrl);
 
       // B. Salva no Firestore (cliente)
       console.log("💾 Salvando avaliação no banco...");
-      await addDoc(collection(db, "reviews"), {
-        restaurantId,
-        photoUrl,
-        rating,
-        comment,
-        createdAt: serverTimestamp(),
-        user: user
-          ? {
-              uid: user.uid,
-              name: user.displayName,
-              avatar: user.photoURL,
-            }
-          : null,
-        userId: user ? user.uid : "user-anonimo",
-      });
+      await withTimeout(
+        addDoc(collection(db, "reviews"), {
+          restaurantId,
+          photoUrl,
+          rating,
+          comment,
+          createdAt: serverTimestamp(),
+          user: {
+            uid: user.uid,
+            name: user.displayName,
+            avatar: user.photoURL,
+          },
+          userId: user.uid,
+        }),
+        15000,
+        "Não foi possível salvar a avaliação.",
+      );
 
       console.log("✅ Review salvo com sucesso");
 
