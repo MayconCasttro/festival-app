@@ -19,11 +19,10 @@
   "terminal.integrated.env.osx": {
     "NODE_ENV": "development"
   },
-  "npm.enableScriptExplorer": true,
 
   // TypeScript
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
   "typescript.preferences.quotePreference": "single",
 
   // Busca e Exclusões
@@ -49,6 +48,6 @@
 
   // JavaScript
   "javascript.inlayHints.variableTypes.enabled": true,
-  "javascript.inlayHints.functionLikeReturnTypes.enabled": true,
-  "javascript.inlayHints.parameterNames.enabled": "literals"
-}
+  "js/ts.inlayHints.variableTypes.enabled": true,
+  "js/ts.inlayHints.functionLikeReturnTypes.enabled": true,
+  "js/ts
