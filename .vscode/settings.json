@@ -1,0 +1,54 @@
+{
+  // Formatação e Editor
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // Node.js e NPM
+  "terminal.integrated.env.osx": {
+    "NODE_ENV": "development"
+  },
+  "npm.enableScriptExplorer": true,
+
+  // TypeScript
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.quotePreference": "single",
+
+  // Busca e Exclusões
+  "search.exclude": {
+    "**/node_modules": true,
+    ".next": true,
+    "out": true,
+    ".vercel": true
+  },
+  "files.exclude": {
+    "**/node_modules": true,
+    ".next": true,
+    ".vercel": true
+  },
+
+  // Linting
+  "eslint.validate": ["javascript", "typescript", "typescriptreact"],
+  "eslint.ignoreUntrackedFiles": false,
+
+  // Next.js
+  "search.useIgnoreFiles": true,
+  "editor.wordWrap": "on",
+
+  // JavaScript
+  "javascript.inlayHints.variableTypes.enabled": true,
+  "javascript.inlayHints.functionLikeReturnTypes.enabled": true,
+  "javascript.inlayHints.parameterNames.enabled": "literals"
+}

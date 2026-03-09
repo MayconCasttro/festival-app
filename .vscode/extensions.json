@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-typescript-next",
+    "firebase.firebase",
+    "ms-nodejs.vscode-node-azure-pack",
+    "vitest.explorer",
+    "lokalise.i18n-ally",
+    "ms-vscode-remote.remote-containers"
+  ]
+}
