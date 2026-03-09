@@ -5,11 +5,9 @@ import { useState } from "react";
 import Image from "next/image";
 import { getDistanceFromLatLonInMeters } from "@/lib/geo";
 import { Camera, MapPin, Loader2, Star, CheckCircle } from "lucide-react";
-import { auth, isFirebaseConfigured } from "@/lib/firebase";
-import {
-  uploadReviewPhoto,
-  saveReviewToFirestore,
-} from "@/app/restaurant/[id]/actions";
+import { auth, db, storage, isFirebaseConfigured } from "@/lib/firebase";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import {
   signInWithPopup,
   GoogleAuthProvider,
@@ -233,37 +231,51 @@ export default function ReviewModal({
         "✅ Arquivo convertido para Base64 (" + base64Data.length + " bytes)",
       );
 
-      // A. Faz upload no servidor (server action)
-      console.log("📤 Enviando para servidor...");
-      const uploadResult = await uploadReviewPhoto(base64Data, file.type);
-      if (!uploadResult.ok) {
-        setError(uploadResult.error);
+      if (!storage) {
+        setError("Storage indisponível");
         return;
       }
 
-      const photoUrl = uploadResult.photoUrl;
+      if (!db) {
+        setError("Banco de dados indisponível");
+        return;
+      }
+
+      // A. Faz upload direto no Firebase Storage (cliente)
+      console.log("📤 Enviando para Firebase Storage...");
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: file.type });
+
+      const ext = file.type.split("/")[1] || "jpg";
+      const filename = `reviews/review-${Date.now()}.${ext}`;
+      const storageRef = ref(storage, filename);
+      const snapshot = await uploadBytes(storageRef, blob, {
+        contentType: file.type,
+      });
+      const photoUrl = await getDownloadURL(snapshot.ref);
       console.log("✅ Foto enviada com sucesso:", photoUrl);
 
-      // B. Salva no Firestore via server action
+      // B. Salva no Firestore (cliente)
       console.log("💾 Salvando avaliação no banco...");
-      const saveResult = await saveReviewToFirestore({
+      await addDoc(collection(db, "reviews"), {
         restaurantId,
         photoUrl,
         rating,
         comment,
+        createdAt: serverTimestamp(),
         user: user
           ? {
               uid: user.uid,
-              displayName: user.displayName,
-              photoURL: user.photoURL,
+              name: user.displayName,
+              avatar: user.photoURL,
             }
           : null,
+        userId: user ? user.uid : "user-anonimo",
       });
-
-      if (!saveResult.ok) {
-        setError(saveResult.error);
-        return;
-      }
 
       console.log("✅ Review salvo com sucesso");
 
