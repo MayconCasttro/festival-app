@@ -201,28 +201,45 @@ export default function ReviewModal({
     setError("");
 
     try {
-      console.log("Iniciando upload da foto...");
+      console.log("🚀 Iniciando envio de review...");
 
       // Converter File para Base64
+      console.log("📖 Convertendo arquivo para Base64...");
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
         reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(",")[1]); // Remove "data:image/jpeg;base64,"
+          try {
+            const result = reader.result as string;
+            const base64 = result.split(",")[1]; // Remove "data:image/jpeg;base64,"
+            if (!base64) {
+              reject(new Error("Falha ao converter arquivo para Base64"));
+              return;
+            }
+            resolve(base64);
+          } catch (e) {
+            reject(e);
+          }
         };
-        reader.onerror = reject;
+        reader.onerror = (e) => {
+          console.error("❌ Erro ao ler arquivo:", e);
+          reject(new Error("Não foi possível ler o arquivo"));
+        };
       });
 
       reader.readAsDataURL(file);
       const base64Data = await base64Promise;
 
-      console.log("✅ Arquivo convertido para Base64");
+      console.log(
+        "✅ Arquivo convertido para Base64 (" + base64Data.length + " bytes)",
+      );
 
       // A. Faz upload no servidor (server action)
+      console.log("📤 Enviando para servidor...");
       const photoUrl = await uploadReviewPhoto(base64Data, file.type);
       console.log("✅ Foto enviada com sucesso:", photoUrl);
 
       // B. Salva no Firestore via server action
+      console.log("💾 Salvando avaliação no banco...");
       await saveReviewToFirestore({
         restaurantId,
         photoUrl,
@@ -245,8 +262,9 @@ export default function ReviewModal({
 
       setStep("success");
     } catch (err: any) {
-      console.error("❌ Erro ao enviar review:", err);
-      setError(err?.message || "Erro ao enviar. Tente novamente.");
+      console.error("❌ Erro completo ao enviar review:", err);
+      const errorMsg = err?.message || err?.toString() || "Erro ao enviar";
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
