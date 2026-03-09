@@ -357,8 +357,23 @@ export default function ReviewModal({
       setStep("success");
     } catch (err: any) {
       console.error("❌ Erro completo ao enviar review:", err);
-      const errorMsg = err?.message || err?.toString() || "Erro ao enviar";
-      setError(errorMsg);
+      const errorCode = err?.code as string | undefined;
+      if (errorCode === "storage/unauthorized") {
+        setError("Sem permissão no Storage. Verifique as regras do Firebase.");
+      } else if (errorCode === "storage/retry-limit-exceeded") {
+        setError(
+          "Tempo limite do upload. Verifique bucket/configuração do Firebase Storage.",
+        );
+      } else if (errorCode === "storage/object-not-found") {
+        setError("Bucket/objeto não encontrado no Firebase Storage.");
+      } else if (errorCode === "storage/unknown") {
+        setError(
+          "Erro desconhecido no Storage. Confirme se o bucket existe no projeto Firebase.",
+        );
+      } else {
+        const errorMsg = err?.message || err?.toString() || "Erro ao enviar";
+        setError(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
