@@ -15,6 +15,7 @@ import {
 } from "firebase/storage";
 import {
   signInWithPopup,
+  signInAnonymously,
   GoogleAuthProvider,
   GithubAuthProvider,
   OAuthProvider, // Para Microsoft
@@ -35,44 +36,58 @@ export default function ReviewModal({
   restaurantLat,
   restaurantLng,
 }: Props) {
+  const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
+
   const compressImage = async (inputFile: File): Promise<Blob> => {
     if (!inputFile.type.startsWith("image/")) return inputFile;
 
-    const bitmap = await createImageBitmap(inputFile);
-    const maxSide = 1600;
-    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-    const width = Math.max(1, Math.round(bitmap.width * scale));
-    const height = Math.max(1, Math.round(bitmap.height * scale));
-
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return inputFile;
-
-    // Resize before upload to avoid long transfers on slower networks.
-    ctx.drawImage(bitmap, 0, 0, width, height);
-
-    const outputType =
-      inputFile.type === "image/png" ? "image/png" : "image/jpeg";
-    const quality = outputType === "image/jpeg" ? 0.8 : undefined;
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (result) => {
-          if (!result) {
-            reject(new Error("Falha ao processar imagem"));
-            return;
-          }
-          resolve(result);
-        },
-        outputType,
-        quality,
+    try {
+      const bitmap = await createImageBitmap(inputFile);
+      const maxSide = 1600;
+      const scale = Math.min(
+        1,
+        maxSide / Math.max(bitmap.width, bitmap.height),
       );
-    });
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
 
-    bitmap.close();
-    return blob;
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return inputFile;
+
+      // Resize before upload to avoid long transfers on slower networks.
+      ctx.drawImage(bitmap, 0, 0, width, height);
+
+      const outputType =
+        inputFile.type === "image/png" ? "image/png" : "image/jpeg";
+      const quality = outputType === "image/jpeg" ? 0.8 : undefined;
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (result) => {
+            if (!result) {
+              reject(new Error("Falha ao processar imagem"));
+              return;
+            }
+            resolve(result);
+          },
+          outputType,
+          quality,
+        );
+      });
+
+      bitmap.close();
+      return blob;
+    } catch (error) {
+      // Some mobile formats (e.g. HEIC) may fail decode in-browser; upload original file instead.
+      console.warn(
+        "Falha ao comprimir imagem, enviando arquivo original.",
+        error,
+      );
+      return inputFile;
+    }
   };
 
   const uploadResumableWithTimeout = async (
@@ -205,6 +220,36 @@ export default function ReviewModal({
     }
   };
 
+  const handleContinueAnonymous = async () => {
+    setLoading(true);
+    setError("");
+
+    if (!isFirebaseConfigured || !auth) {
+      setError(t("authNotConfigured"));
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const result = await signInAnonymously(auth);
+      setUser(result.user);
+      setStep("gps");
+    } catch (error: any) {
+      console.error("❌ Firebase Anonymous Auth Error:", error);
+      if (error?.code === "auth/operation-not-allowed") {
+        setError(
+          "Login anônimo desativado no Firebase. Ative em Authentication > Sign-in method.",
+        );
+      } else {
+        setError(
+          `${t("loginError")} (${error?.code || "anonymous-auth-error"})`,
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 1. Verificar GPS
   const checkLocation = () => {
     setLoading(true);
@@ -256,8 +301,8 @@ export default function ReviewModal({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (selected) {
-      // Validação: máximo 5MB
-      if (selected.size > 5 * 1024 * 1024) {
+      // Validate very large files before processing to avoid browser memory spikes.
+      if (selected.size > MAX_IMAGE_SIZE_BYTES) {
         setError(t("imageTooLarge"));
         return;
       }
@@ -285,7 +330,7 @@ export default function ReviewModal({
     try {
       console.log("🚀 Iniciando envio de review...");
 
-      if (!user || !auth?.currentUser) {
+      if (!user) {
         setError("Faça login para enviar foto.");
         setStep("auth");
         return;
@@ -305,7 +350,7 @@ export default function ReviewModal({
       console.log("📤 Enviando para Firebase Storage...");
       const compressedImage = await compressImage(file);
       const ext = file.type.split("/")[1] || "jpg";
-      const filename = `reviews/${auth.currentUser.uid}/review-${Date.now()}.${ext}`;
+      const filename = `reviews/${user.uid}/review-${Date.now()}.${ext}`;
       const storageRef = ref(storage, filename);
       const metadata: UploadMetadata = {
         contentType:
@@ -476,8 +521,9 @@ export default function ReviewModal({
             </button>
           </div>
           <button
-            onClick={() => setStep("gps")}
-            className="mt-4 text-sm text-gray-500 hover:underline"
+            onClick={handleContinueAnonymous}
+            disabled={loading}
+            className="mt-4 text-sm text-gray-500 hover:underline disabled:opacity-50"
           >
             <LocalizedText
               defaultText={TRANSLATIONS.pt.continueAnonymous}

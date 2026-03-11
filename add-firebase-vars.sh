@@ -1,4 +1,4 @@
-#!/bin/bash
+https://nucleogastronomico.vercel.app#!/bin/bash
 
 # Script rápido para adicionar variáveis Firebase no Vercel
 # Execução: VERCEL_TOKEN="seu_token" bash add-firebase-vars.sh
